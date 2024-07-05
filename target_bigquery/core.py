@@ -151,7 +151,7 @@ class BigQueryTable:
         """Returns a DatasetReference for this table."""
         return bigquery.DatasetReference(self.project, self.dataset)
 
-    @cache
+    # @cache
     def as_table(self, apply_transforms: bool = False, **kwargs) -> bigquery.Table:
         """Returns a Table instance for this table."""
         table = bigquery.Table(
@@ -626,7 +626,7 @@ def augmented_syspath(new_paths: Optional[Iterable[str]] = None):
         sys.path = original_sys_path
 
 
-@cache
+# @cache
 def bigquery_client_factory(creds: BigQueryCredentials) -> bigquery.Client:
     """Get a BigQuery client."""
     if creds.path:
@@ -640,7 +640,7 @@ def bigquery_client_factory(creds: BigQueryCredentials) -> bigquery.Client:
     return bigquery.Client(project=creds.project)
 
 
-@cache
+# @cache
 def gcs_client_factory(creds: BigQueryCredentials) -> storage.Client:
     """Get a GCS client."""
     if creds.path:
@@ -654,7 +654,7 @@ def gcs_client_factory(creds: BigQueryCredentials) -> storage.Client:
     return storage.Client(project=creds.project)
 
 
-@cache
+# @cache
 def storage_client_factory(
     creds: BigQueryCredentials,
 ) -> bigquery_storage_v1.BigQueryWriteClient:
@@ -1081,7 +1081,7 @@ def bigquery_type(
 # This allows users to only use the transforms they need and not
 # become dependent on inconfigurable transforms outside their
 # realm of control which must be recreated if migrating loaders.
-@cache
+# @cache
 def transform_column_name(
     name: str,
     quote: bool = False,
