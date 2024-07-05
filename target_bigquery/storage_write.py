@@ -70,11 +70,12 @@ def get_application_stream(client: BigQueryWriteClient, job: "Job") -> StreamCom
     append_rows_stream = writer.AppendRowsStream(client, job.template)
     rv = (write_stream.name, append_rows_stream)
     job.stream_notifier.send(rv)
-    return *rv, retry(
+    res = *rv, retry(
         wait=wait_fixed(2),
         stop=stop_after_attempt(5),
         reraise=True,
     )(append_rows_stream.send)
+    return res
 
 
 def get_default_stream(client: BigQueryWriteClient, job: "Job") -> StreamComponents:
@@ -85,11 +86,12 @@ def get_default_stream(client: BigQueryWriteClient, job: "Job") -> StreamCompone
     append_rows_stream = writer.AppendRowsStream(client, job.template)
     rv = (job.template.write_stream, append_rows_stream)
     job.stream_notifier.send(rv)
-    return *rv, retry(
+    res = *rv, retry(
         wait=wait_fixed(2),
         stop=stop_after_attempt(5),
         reraise=True,
     )(append_rows_stream.send)
+    return res
 
 
 def generate_request(
