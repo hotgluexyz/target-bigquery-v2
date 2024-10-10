@@ -8,6 +8,7 @@
 #
 # The above copyright notice and this permission notice shall be included in all copies or
 # substantial portions of the Software.
+import os
 import datetime
 import gzip
 import json
@@ -325,12 +326,8 @@ class BaseBigQuerySink(BatchSink):
         # In absence of dedupe or overwrite candidacy, we append to the target table directly
         # If the stream is marked for one of these strategies, we create a temporary table instead
         # and merge or overwrite the target table with the temporary table after the ingest.
-        if (
-            key_properties
-            and self.ingestion_strategy is IngestionStrategy.DENORMALIZED
-            and self._is_upsert_candidate()
-        ):
-            self.merge_target = copy(self.table)
+        if self._is_overwrite_candidate():
+            self.overwrite_target = copy(self.table)
             self.table = BigQueryTable(
                 name=f"{self.table_name}__{time.strftime('%Y%m%d%H%M%S')}__{uuid.uuid4()}",
                 **opts,
@@ -351,8 +348,12 @@ class BaseBigQuerySink(BatchSink):
                 },
             )
             time.sleep(2.5)  # Wait for eventual consistency
-        elif self._is_overwrite_candidate():
-            self.overwrite_target = copy(self.table)
+        elif (
+            key_properties
+            and self.ingestion_strategy is IngestionStrategy.DENORMALIZED
+            and self._is_upsert_candidate()
+        ):
+            self.merge_target = copy(self.table)
             self.table = BigQueryTable(
                 name=f"{self.table_name}__{time.strftime('%Y%m%d%H%M%S')}__{uuid.uuid4()}",
                 **opts,
@@ -396,7 +397,7 @@ class BaseBigQuerySink(BatchSink):
 
     def _is_overwrite_candidate(self) -> bool:
         """Determine if this stream is an overwrite candidate based on user configuration."""
-        overwrite_selection = self.config.get("overwrite", False)
+        overwrite_selection = self.config.get("overwrite", False) or (self.config.get("truncate_on_full_sync") and os.environ.get("SYNC_TYPE") == "full_sync")
         overwrite_candidate = False
         if isinstance(overwrite_selection, list):
             selection: str
