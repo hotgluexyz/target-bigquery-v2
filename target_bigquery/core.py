@@ -518,6 +518,41 @@ class BaseBigQuerySink(BatchSink):
     ) -> Union[Type[BaseWorker], Type["Process"]]:
         """Return a worker class for the given parallelization type."""
         raise NotImplementedError
+    
+    def create_new_columns_in_target_table(self, client, target_table, source_table):
+
+        # Get schemas
+        try:
+            target_schema = client.get_table(target_table).schema
+            source_schema = client.get_table(source_table).schema
+        except NotFound as e:
+            self.logger.info(f"Target table or source table not found, no need to add new columns, e: {e.__str__}")
+            # if table doesn't exist no need to add missing columns
+            return
+
+        # Get column names
+        target_columns = {field.name for field in target_schema}
+        source_columns = {field.name for field in source_schema}
+
+        # Find missing columns
+        missing_columns = source_columns - target_columns
+
+        # some types are incompatible with bigquery, map to compatible types
+        types = {
+            "FLOAT": "FLOAT64",
+            "INT": "INTEGER"
+        }
+
+        # Add missing columns
+        for column in missing_columns:
+            field = next(f for f in source_schema if f.name == column)
+            field_type = types.get(field.field_type) or field
+            alter_query = f"""
+            ALTER TABLE `{target_table}`
+            ADD COLUMN IF NOT EXISTS {field.name} {field_type}
+            """
+            client.query(alter_query).result()
+            print(f"Added column {column} of type {field_type} to target table {target_table}.")
 
     def clean_up(self) -> None:
         """Clean up the target table."""
@@ -556,6 +591,10 @@ class BaseBigQuerySink(BatchSink):
                 f"INSERT ({', '.join(f'`{f.name}`' for f in target.schema)}) "
                 f"VALUES ({', '.join(f'source.`{f.name}`' for f in target.schema)})"
             )
+            # create new columns in target table 
+            temp_table_id = f"{tmp or self.table}"
+            self.create_new_columns_in_target_table(bigquery_client, f"{self.merge_target}", temp_table_id)
+            
             bigquery_client.query(
                 f"{ctas_tmp}; {merge_clause} "
                 f"WHEN MATCHED THEN {update_clause} "
